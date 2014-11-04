@@ -2,6 +2,7 @@ import re
 import datetime
 import argparse
 import functools
+import math
 
 class Sub(object):
     REGEX_TIMING = re.compile('(?P<start>\d{2}\:\d{2}\:\d{2,3},\d{3}) \-\-\> (?P<end>\d{2}\:\d{2}\:\d{2,3},\d{3})')
@@ -63,8 +64,40 @@ class WrapRule(BaseRule):
             sub.text = self.wrap(sub.text, self.limit)
         return super(WrapRule, self).execute(sub)
 
+    @staticmethod
+    def break_to_lines(text):
+        lines = text.split('\n')
+        if lines is None:
+            return [text]
+        else:
+            return lines
+            
+    @staticmethod
+    def break_to_words(text):
+        words = text.split(' ');
+        if words is None:
+            return [text]
+        else:
+            return words
+        
     @staticmethod    
-    def wrap(text, width):
+    def wrap(text, width, target_lines=-1):
+        """
+        Method try to keep number of lines at minimum by rebalance words equally between 
+        the lines to get more or less equal lines length.
+        """
+        new_text = WrapRule.wrap_real(text, width);
+        lines_count = len(WrapRule.break_to_lines(new_text))
+        if target_lines == -1 and width > 1:
+            return WrapRule.wrap(text, width - 1, lines_count)
+        else:
+            if target_lines == lines_count and width > 1:
+                return WrapRule.wrap(text, width - 1, lines_count)
+            else:
+                return WrapRule.wrap_real(text, width + 1);
+
+    @staticmethod    
+    def wrap_real(text, width):
         """
         A word-wrap function that preserves existing line breaks
         and most spaces in the text. Expects that existing line
