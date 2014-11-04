@@ -50,6 +50,46 @@ class BaseRule(object):
             return self.decorated.execute(sub)
         return sub
 
+"""
+Each sentence longer than N symbols moved to the new line.
+"""
+class SentenceNewLineRule(BaseRule):
+    def __init__(self, max_symbols, decorated=None):
+        self.max_symbols = max_symbols
+        super(SentenceNewLineRule, self).__init__(decorated=decorated)
+
+    def execute(self, sub):
+        if hasattr(sub, '__iter__'):
+            for s in sub:
+                s.text = self.split(s.text, self.max_symbols, '.')
+                s.text = self.split(s.text, self.max_symbols, '!')
+                s.text = self.split(s.text, self.max_symbols, '?')
+                
+        else:
+            sub.text = self.split(sub.text, self.max_symbols, '.')
+            sub.text = self.split(sub.text, self.max_symbols, '!')
+            sub.text = self.split(sub.text, self.max_symbols, '?')
+        return super(SentenceNewLineRule, self).execute(sub)
+    
+    @staticmethod
+    def split(text, width, split_char):
+        lines = text.splitlines()
+        result_text = ""
+        for line_idx, line in enumerate(lines):
+            if line_idx != 0:
+                result_text = result_text + '\n'
+            sublines = line.split(split_char + ' ')
+            sublines_count = len(sublines)
+            for idx, subline in enumerate(sublines):
+                if idx == sublines_count - 1:
+                    result_text = result_text + subline
+                else:
+                    if len(subline) >= width:
+                        result_text = result_text + subline + split_char + "\n"
+                    else:
+                        result_text = result_text + subline + split_char + " "
+        return result_text
+        
 
 class WrapRule(BaseRule):
     def __init__(self, limit, decorated=None):
@@ -64,22 +104,6 @@ class WrapRule(BaseRule):
             sub.text = self.wrap(sub.text, self.limit)
         return super(WrapRule, self).execute(sub)
 
-    @staticmethod
-    def break_to_lines(text):
-        lines = text.split('\n')
-        if lines is None:
-            return [text]
-        else:
-            return lines
-            
-    @staticmethod
-    def break_to_words(text):
-        words = text.split(' ');
-        if words is None:
-            return [text]
-        else:
-            return words
-        
     @staticmethod    
     def wrap(text, width, target_lines=-1):
         """
@@ -87,7 +111,7 @@ class WrapRule(BaseRule):
         the lines to get more or less equal lines length.
         """
         new_text = WrapRule.wrap_real(text, width);
-        lines_count = len(WrapRule.break_to_lines(new_text))
+        lines_count = len(new_text.splitlines())
         if target_lines == -1 and width > 1:
             return WrapRule.wrap(text, width - 1, lines_count)
         else:
@@ -156,8 +180,7 @@ if __name__ == "__main__":
     parser.add_argument('--encoding', type=str, default="utf-8")
 
     args = parser.parse_args()
-    rules = WrapRule(limit=args.limit, decorated=M2LinesRule())
-
+    rules = SentenceNewLineRule(max_symbols=args.limit / 2, decorated=WrapRule(limit=args.limit, decorated=M2LinesRule()))
     subs = []
     with open(args.input, encoding=args.encoding) as f:
         raw_sub = ""
